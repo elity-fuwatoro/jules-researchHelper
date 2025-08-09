@@ -59,9 +59,6 @@ async function loadMainView() {
 }
 
 async function loadSettingsView() {
-    // This function remains the same as before.
-    // To save space, it is not repeated here, but it is part of the file.
-    // ... (The full code for loadSettingsView from the previous step is assumed to be here)
     contentArea.innerHTML = `
         <h2>設定</h2>
         <div class="settings-section">
@@ -206,12 +203,10 @@ async function loadSettingsView() {
     loadResearchData();
 }
 
-// --- NEW FUNCTION for Room Details ---
 async function loadRoomDetailView(roomNumber) {
     const patient = await getPatientByRoom(roomNumber);
 
     if (patient) {
-        // --- Occupied Room: Display Patient Info ---
         contentArea.innerHTML = `
             <h2>部屋 ${roomNumber} - 患者情報</h2>
             <div class="patient-info-card">
@@ -223,16 +218,37 @@ async function loadRoomDetailView(roomNumber) {
                 <p><strong>入院日:</strong> ${patient.admissionDate}</p>
             </div>
             <button id="discharge-btn" class="delete-btn">退床させる</button>
-            <div id="patient-research-area"></div>
+            <div id="patient-research-area" class="settings-section">
+                <h3>研究データ入力</h3>
+                <div id="research-selection-list"></div>
+                <hr>
+                <div id="research-form-container"></div>
+            </div>
         `;
-        // TODO: Implement research data area in the next step.
+
+        const researchSelectionList = document.getElementById('research-selection-list');
+        const allResearches = await getAllResearches();
+
+        if (allResearches && allResearches.length > 0) {
+            allResearches.forEach(research => {
+                const researchButton = document.createElement('button');
+                researchButton.className = 'secondary-btn research-select-btn';
+                researchButton.textContent = research.researchName;
+                researchButton.addEventListener('click', () => {
+                    renderResearchForm(patient, research);
+                });
+                researchSelectionList.appendChild(researchButton);
+            });
+        } else {
+            researchSelectionList.innerHTML = '<p>利用可能な研究はありません。</p>';
+        }
 
         document.getElementById('discharge-btn').addEventListener('click', async () => {
             if (confirm(`${patient.name}さんを退床させますか？`)) {
                 try {
                     await dischargePatient(patient.patientId);
                     alert('退床処理が完了しました。');
-                    loadRoomDetailView(roomNumber); // Refresh view to show empty form
+                    loadRoomDetailView(roomNumber);
                 } catch (error) {
                     console.error('Discharge failed:', error);
                     alert('退床処理中にエラーが発生しました。');
@@ -241,7 +257,6 @@ async function loadRoomDetailView(roomNumber) {
         });
 
     } else {
-        // --- Empty Room: Display Admission Form ---
         const doctors = await getSetting('doctors') || [];
         const doctorOptions = doctors.map(d => `<option value="${d}">${d}</option>`).join('');
 
@@ -250,32 +265,20 @@ async function loadRoomDetailView(roomNumber) {
             <form id="admission-form" class="form-card">
                 <label for="patientId">患者ID</label>
                 <input type="text" id="patientId" required>
-
                 <label for="name">氏名</label>
                 <input type="text" id="name" required>
-
                 <label for="age">年齢</label>
                 <input type="number" id="age" required>
-
                 <label for="sex">性別</label>
-                <select id="sex" required>
-                    <option value="男性">男性</option>
-                    <option value="女性">女性</option>
-                </select>
-
+                <select id="sex" required><option value="男性">男性</option><option value="女性">女性</option></select>
                 <label for="doctor">主治医</label>
-                <select id="doctor" required>
-                    ${doctorOptions}
-                </select>
-
+                <select id="doctor" required>${doctorOptions}</select>
                 <label for="admissionDate">入院日</label>
                 <input type="date" id="admissionDate" required>
-
                 <button type="submit" class="save-btn">入床させる</button>
             </form>
         `;
 
-        // Set admission date to today by default
         document.getElementById('admissionDate').value = new Date().toISOString().split('T')[0];
 
         document.getElementById('admission-form').addEventListener('submit', async (event) => {
@@ -300,20 +303,17 @@ async function loadRoomDetailView(roomNumber) {
             try {
                 const existingPatient = await getCurrentPatientById(patientData.patientId);
                 if (existingPatient) {
-                    // Patient is already in another room, move them.
                     if (confirm(`患者ID ${patientData.patientId} は既に部屋 ${existingPatient.roomNumber} に入床しています。この部屋に移動させますか？`)) {
-                        // Update all data from the form, not just room number
                         const updatedData = { ...existingPatient, ...patientData };
                         await updatePatient(updatedData);
                         alert('患者を移動しました。');
-                        loadRoomDetailView(roomNumber); // Refresh view
-                        loadMainView(); // Refresh main view to update old room
+                        loadRoomDetailView(roomNumber);
+                        loadMainView();
                     }
                 } else {
-                    // New patient admission
                     await addPatient(patientData);
                     alert('患者を入床させました。');
-                    loadRoomDetailView(roomNumber); // Refresh view
+                    loadRoomDetailView(roomNumber);
                 }
             } catch (error) {
                 console.error('Admission failed:', error);
@@ -321,4 +321,104 @@ async function loadRoomDetailView(roomNumber) {
             }
         });
     }
+}
+
+async function renderResearchForm(patient, research) {
+    const container = document.getElementById('research-form-container');
+    container.innerHTML = `<h4>${research.researchName} - データ入力</h4>`;
+
+    const existingData = await getResearchData(patient.patientId, research.researchId);
+    const data = existingData ? existingData.data : {};
+
+    const form = document.createElement('form');
+    form.id = 'dynamic-research-form';
+
+    research.fields.forEach(field => {
+        const fieldWrapper = document.createElement('div');
+        fieldWrapper.className = 'form-field';
+
+        const label = document.createElement('label');
+        label.textContent = field.name;
+        fieldWrapper.appendChild(label);
+
+        let input;
+        switch (field.type) {
+            case 'select':
+                input = document.createElement('select');
+                // Add a blank default option
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = '選択してください';
+                input.appendChild(defaultOption);
+
+                field.options.forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt;
+                    option.textContent = opt;
+                    if (data[field.name] === opt) {
+                        option.selected = true;
+                    }
+                    input.appendChild(option);
+                });
+                break;
+            case 'date':
+                input = document.createElement('input');
+                input.type = 'date';
+                input.value = data[field.name] || '';
+                break;
+            case 'number':
+                input = document.createElement('input');
+                input.type = 'number';
+                input.value = data[field.name] || '';
+                break;
+            case 'text':
+            default:
+                input = document.createElement('input');
+                input.type = 'text';
+                input.value = data[field.name] || '';
+                break;
+        }
+        input.dataset.fieldName = field.name;
+        fieldWrapper.appendChild(input);
+        form.appendChild(fieldWrapper);
+    });
+
+    const saveButton = document.createElement('button');
+    saveButton.type = 'submit';
+    saveButton.className = 'save-btn';
+    saveButton.textContent = 'この研究データを保存';
+    form.appendChild(saveButton);
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const collectedData = {};
+        const inputs = form.querySelectorAll('[data-field-name]');
+        inputs.forEach(input => {
+            collectedData[input.dataset.fieldName] = input.value;
+        });
+
+        const dataToSave = {
+            patientId: patient.patientId,
+            researchId: research.researchId,
+            data: collectedData
+        };
+
+        // If we are updating, we must include the primary key (dataId) for the 'put' operation
+        if (existingData && existingData.dataId) {
+            dataToSave.dataId = existingData.dataId;
+        }
+
+        try {
+            await saveResearchData(dataToSave);
+            alert('研究データを保存しました。');
+            // Re-render form to confirm data is saved and loaded correctly
+            renderResearchForm(patient, research);
+        } catch (error) {
+            console.error('Failed to save research data:', error);
+            alert('研究データの保存中にエラーが発生しました。');
+        }
+    });
+
+    container.appendChild(form);
 }

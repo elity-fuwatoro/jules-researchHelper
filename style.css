@@ -114,6 +114,52 @@ button:hover {
     width: 100%;
     padding: 0.7rem;
     font-size: 1rem;
+    margin-bottom: 1rem;
+}
+
+#patient-research-area {
+    margin-top: 1.5rem;
+}
+
+#research-selection-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.research-select-btn {
+    margin-bottom: 0.5rem;
+}
+
+#patient-research-area hr {
+    margin: 1.5rem 0;
+    border: 0;
+    border-top: 1px solid #eee;
+}
+
+#dynamic-research-form .form-field {
+    margin-bottom: 1rem;
+}
+
+#dynamic-research-form .form-field label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: bold;
+    color: #333;
+}
+
+#dynamic-research-form .form-field input,
+#dynamic-research-form .form-field select {
+    width: 100%;
+    padding: 0.6rem;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+}
+
+#dynamic-research-form .save-btn {
+    width: auto;
+    padding: 0.7rem 2rem;
 }
 
 /* Settings Page Styles */
